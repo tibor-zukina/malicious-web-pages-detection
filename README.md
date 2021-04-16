@@ -4,19 +4,24 @@ This repository contains the code for detecting injected malicous HTML and JavaS
 
 HTML fetch functions usage:
 
-# raw HTML fetch from URL
+# Raw HTML fetch from URL
 
-websiteURL = 'https://example.com';
+websiteURL = 'https://example.com'
+
 rawHTML = pagefetch.fetchRawHTML(websiteURL)
 
 # fetching HTML from MongoDB database
 
 connectionString = 'mongodb://user:password@host:port'
+
 databaseName = 'webpage_database'
+
 collectionName = 'webpage_collection'
+
 
 pagefetch.setMongoConnection(connectionString, databaseName, collectionName)
 
 webpageId = 'unique_website_id'
+
 mongoHTML = pagefetch.fetchMongoHTML(webpageId)
 
