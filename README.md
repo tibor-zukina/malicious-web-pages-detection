@@ -10,7 +10,7 @@ websiteURL = 'https://example.com'
 
 rawHTML = pagefetch.fetchRawHTML(websiteURL)
 
-# fetching HTML from MongoDB database
+# Fetching HTML from MongoDB database
 
 connectionString = 'mongodb://user:password@host:port'
 
