@@ -28,3 +28,14 @@ def fetchMongoHTML(pageId):
     webpagesCollection = webpagesDatabase[webpagesCollectionName]
     html = webpagesCollection.find_one({"_id": ObjectId(pageId)})['page'];
     return html
+	
+def readHTMLFromFile(path):
+    htmlFile = open(path)
+    html = htmlFile.read()
+    htmlFile.close();
+    return html;
+	
+def writeHTMLToFile(path, html):
+    htmlFile = open(path, "w")
+    htmlFile.write(html)
+    htmlFile.close()
