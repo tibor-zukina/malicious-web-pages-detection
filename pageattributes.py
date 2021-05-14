@@ -10,6 +10,7 @@ from pysafebrowsing import SafeBrowsing
 import pagefetch
 import jsado
 import os
+import urllib.request
 
 whoisAPIKey = None
 geoIPDatabasePath = None
@@ -164,3 +165,15 @@ def getSafeBrowsingStatus(url):
     except Exception as msg:
         label = ''
         return label
+		
+def checkForRedirect(inputData):
+    if isinstance(inputData, int):
+        responseCode = inputData
+    elif isinstance(inputData, str):
+        responseCode = urllib.request.urlopen(inputData).getcode()
+    else:	
+        responseCode = inputData['responseCode']
+    if responseCode is not None and (responseCode == 301 or responseCode == 302):
+        return True
+    else:
+        return False
