@@ -59,6 +59,17 @@ def fetchMongoHTMLList(pageIdList):
         htmlList.append({'id': id, 'html': html})
     return htmlList
 	
+def fetchMongoHTMLSet(numberOfPages, offset = 0):
+    if mongoConnection is None:
+        raise ConnectionNotSetException("MongoDB connection not set")
+    webpagesDatabase = mongoConnection[webpagesDatabaseName]
+    webpagesCollection = webpagesDatabase[webpagesCollectionName]
+    htmlSet = []
+    htmlSetCursor = webpagesCollection.find({"page" : {'$regex' : '(^\<html\>)|(^\<!DOCTYPE HTML)', '$options': 'i'}},{ "_id": 1, "page": 1}).skip(offset).limit(numberOfPages)
+    for html in htmlSetCursor:
+        htmlSet.append({"id": str(html['_id']) , 'html': html['page']})
+    return htmlSet
+	
 def readHTMLFromFile(path):
     htmlFile = open(path)
     html = htmlFile.read()
