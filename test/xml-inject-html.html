@@ -1,0 +1,13 @@
+<body>
+<html>
+<script>
+var xhttp = new XMLHttpRequest();
+xhttp.onreadystatechange = function() {
+if (xhttp.readyState == 4 && xhttp.status == 200) {
+    var xmlDoc = xhttp.responseXML; 
+}
+xhttp.open("GET", "example.xml", true);
+xhttp.send();
+</script>
+</html>
+</body>
