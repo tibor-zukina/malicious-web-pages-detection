@@ -81,7 +81,15 @@ Loading list of HTML files from directory:
 
 inputPath = 'html_files'
 
-directoryHTMLList = readHTMLListFromDir(inputPath)
+directoryHTMLList = pagefetch.readHTMLListFromDir(inputPath)
+
+
+Loading list of HTML files from database pages directory:
+---
+
+inputPath = 'database_webpages'
+
+databaseDirectoryHTMLList = pagefetch.readHTMLListFromDatabaseDir(inputPath)
 
 
 Saving HTML into file:
@@ -306,6 +314,44 @@ containsMetaRedirect = htmlhandler.metaRefreshTagsExist(testSoupObject)
 containsScriptRedirects = htmlhandler.containsRedirectingScripts(testSoupObject)
 
 
+Detect XML injection in JavaScript:
+---
+
+testPath = 'test/xml-inject-html.html'
+
+testHTML = pagefetch.readHTMLFromFile(testPath)
+
+testSoupObject = htmlhandler.makeBeautifulSoup(testHTML)
+
+doScriptsInjectHTML = htmlhandler.scriptsInjectXML(testSoupObject)
+
+
+Yara checking functions usage (yarachecker.py module):
+---
+
+
+Generate yara rules object:
+---
+
+yaraRulesPatch = 'yara_rules.yar'
+
+yarachecker.setYaraRulesObject('yara_rules.yar')
+
+
+Get yara rules matches:
+---
+
+yaraRulesPath = 'yara_rules.yar'
+
+htmlPath = 'test_html.html'
+
+yarachecker.setYaraRulesObject(yaraRulesPath)
+
+html = pagefetch.readHTMLFromFile(htmlPath)
+
+matches = yarachecker.getYaraMatches(html)
+
+
 Website checking functions usage (pagechecker.py module):
 ---
 
@@ -315,25 +361,25 @@ Check HTML by the selected algorithm:
 
 testPath = 'test/test-html.html'
 
+yaraRulesPath = 'yara_rules.yar'
+
 testHTML = pagefetch.readHTMLFromFile(testPath)
 
-staticHeuristicsCheckResult = pagechecker.analyzeWebpage(testHTML, 'static heuristics')
+staticHeuristicsCheckResult = pagechecker.analyzeWebpage({'html': testHTML}, 'static heuristics')
 
-scoringMechanismCheckResult = pagechecker.analyzeWebpage(testHTML, 'scoring mechanism')
+scoringMechanismCheckResult = pagechecker.analyzeWebpage({'html': testHTML}, 'scoring mechanism')
 
-yaraRulesCheckResult = pagechecker.analyzeWebpage(testHTML, 'yara rules')
+yaraRulesCheckResult = pagechecker.analyzeWebpage({'html': testHTML}, 'yara rules', yaraRulesPath)
 
 
 Check HTML list by selected algorithm:
 ---
 
-connectionString = 'mongodb://user:password@host:port'
+inputPath = 'database_webpages'
 
-databaseName = 'webpage_database'
+yaraRulesPath = 'yara_rules.yar'
 
-collectionName = 'webpage_collection'
-
-pagefetch.setMongoConnection(connectionString, databaseName, collectionName)
+pagefetch.readHTMLListFromDatabaseDir(inputPath)
 
 mongoHTMLSet = pagefetch.fetchMongoHTMLSet(10)
 
@@ -341,11 +387,11 @@ staticHeuristicsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'static he
 
 scoringMechanismCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'scoring mechanism')
 
-yaraRulesCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'yara rules')
+yaraRulesCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'yara rules', yaraRulesPath)
 
-randomAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'random')
+randomAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'random', yaraRulesPath)
 
-allAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'all')
+allAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'all', yaraRulesPath)
 
 
 Testing malicious webpages detection algorithms (test.py module):
@@ -365,7 +411,7 @@ staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10)
 
 scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10)
 
-yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10)
+yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10, yaraRulesPath = 'yara_rules.yar')
 
 
 Testing algorithm on set of webpages with expected results:
@@ -381,33 +427,25 @@ staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10,
 
 scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10, expectedResultsPath = 'test/expected_results.csv')
 
-yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10, expectedResultsPath = 'test/expected_results.csv')
+yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10, yaraRulesPath = 'yara_rules.yar', expectedResultsPath = 'test/expected_results.csv')
 
 
 Comparing different algorithms results:
 ---
 
-connectionString = open('connection_string', 'r').readline()
+databaseDirectoryPath = 'database_webpages'
 
-databaseName = 'websecradar'
+compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'scoring mechanism')
 
-collectionName = 'crawled_data_pages_v0'
+compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'yara rules', yaraRulesPath = 'yara_rules.yar')
 
-compareAlgorithms(connectionString, databaseName, collectionName, 'static heuristics', 'scoring mechanism', 10, offset = 0)
-
-compareAlgorithms(connectionString, databaseName, collectionName, 'static heuristics', 'yara rules', 10, offset = 0)
-
-compareAlgorithms(connectionString, databaseName, collectionName, 'scoring mechanism', 'yara rules', 10, offset = 0)
+compareAlgorithms(databaseDirectoryPath, 'scoring mechanism', 'yara rules', yaraRulesPath = 'yara_rules.yar')
 
 
 Analysing all algorithms:
 ---
 
-connectionString = open('connection_string', 'r').readline()
+databaseDirectoryPath = 'database_webpages'
 
-databaseName = 'websecradar'
-
-collectionName = 'crawled_data_pages_v0'
-
-analyzeAllAlgorithms(connectionString, databaseName, collectionName, 10, 'test/expected_results.csv', 'test/analysis_results.csv')
+analyzeAllAlgorithms(databaseDirectoryPath, yaraRulesPath = 'yara_rules.yar', analysisResultsPath = 'test/analysis_results.csv')
 
