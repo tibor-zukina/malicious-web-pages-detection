@@ -1,10 +1,15 @@
 import pageattributes
 import htmlhandler
 import random
+import yarachecker
+from yarachecker import rulesInterpretation
 
 supportedAlgorithms = ('static heuristics', 'scoring mechanism', 'yara rules')
 
 class UnsupportedCheckingAlgorithmException(Exception):
+    pass
+	
+class YaraRulesPathNotSetException(Exception):
     pass
 
 def checkByStaticHeuristics(html, domain = None, httpResponseCode = None):
@@ -17,23 +22,31 @@ def checkByStaticHeuristics(html, domain = None, httpResponseCode = None):
         if smallIFrames > 0:
             analysisResults['status'] = 'malicious'
             analysisResults['details'] = 'webpage contains small iframe elements'
-            return analysisResults
         else:
             objectsNumber = htmlhandler.countObjectTags(bsObject)
             if objectsNumber > 0:
                 analysisResults['status'] = 'malicious'
                 analysisResults['details'] = 'webpage contains iframe elements and object elements'
-                return analysisResults
             else:
-                scriptsNumber = htmlhandler.countScriptTags(bsObject)
-                if scriptsNumber > 4:
-                    analysisResults['status'] = 'benign'
-                    analysisResults['details'] = 'no malicious properties detected'
-                    return analysisResults
+                embedNumber = htmlHandler.countEmbedTags(bsObject)
+                if embedNumber > 0:
+                    analysisResults['status'] = 'malicious'
+                    analysisResults['details'] = 'webpage contains iframe elements and embed elements'
                 else:
-                    analysisResults['status'] = 'benign'
-                    analysisResults['details'] = 'no malicious properties detected'
-                    return analysisResults
+                    scriptsNumber = htmlhandler.countScriptTags(bsObject)
+                    if scriptsNumber > 4:
+                        analysisResults['status'] = 'benign'
+                        analysisResults['details'] = 'no malicious properties detected'
+                    else:
+                        if scriptsNumber <= 2:
+                            containsMetaRedirects = htmlHandler.metaRefreshTagsExist(bsObject)
+                            containsScriptRedirects = htmlHandler.containsRedirectingScripts(bsObject)
+                            if containsMetaRedirects or containsScriptRedirects:
+                                analysisResults['status'] = 'malicious'
+                                analysisResults['details'] = 'webpage contains iframe elements, small number of script tags and redirects'
+                            else:
+                                analysisResults['status'] = 'benign'
+                                analysisResults['details'] = 'no malicious properties detected'
     else:
         obfuscationData = htmlhandler.detectObfuscation(bsObject)
         scriptsWithEscapedCharacters = obfuscationData['escaped_characters']
@@ -42,15 +55,28 @@ def checkByStaticHeuristics(html, domain = None, httpResponseCode = None):
             if obfuscatedScripts > 0:
                 analysisResults['status'] = 'malicious'
                 analysisResults['details'] = 'obfuscated javascript code has been detected'
-                return analysisResults
             else:
                 analysisResults['status'] = 'benign'
-                analysisResults['details'] = 'no malicious properties detected'
-                return analysisResults	
+                analysisResults['details'] = 'no malicious properties detected'	
         else:
-            analysisResults['status'] = 'benign'
-            analysisResults['details'] = 'no malicious properties detected'
-            return analysisResults	
+            xmlProcessingInstructionsNumber = htmlhandler.countXMLProcessingInstructions(html)
+            if xmlProcessingInstructionsNumber > 0:
+                internalScriptsCount = htmlhandler.countInternalScripts(bsObject, domain)
+                if internalScriptsCount > 0:
+                    analysisResults['status'] = 'malicious'
+                    analysisResults['details'] = 'webpage contains escaped characters, xml processing instructions and additional internal scripts'
+                else:
+                    doScriptsInjectXML = htmlHandler.scriptsInjectXML(bsObject, domain)
+                    if doScriptsInjectXML:
+                        analysisResults['status'] = 'malicious'
+                        analysisResults['details'] = 'webpage contains escaped characters, xml processing instructions and its inline scripts inject XML'
+                    else:
+                        analysisResults['status'] = 'benign'
+                        analysisResults['details'] = 'no malicious properties detected'
+            else:
+                analysisResults['status'] = 'benign'
+                analysisResults['details'] = 'no malicious properties detected'    
+    return analysisResults			
 
 def checkByScoringMechanism(html, scoringParameters = None):
     analysisResults = {'status':'not classified', 'details':''}
@@ -58,33 +84,47 @@ def checkByScoringMechanism(html, scoringParameters = None):
     analysisResults['details'] = 'scoring algorithm has not yet been implemented'
     return analysisResults 
 
-def checkByYaraRules(html):
+def checkByYaraRules(html, yaraRulesPath):
     analysisResults = {'status':'not classified', 'details':''}
-    analysisResults['status'] = 'benign'
-    analysisResults['details'] = 'yara algorithm has not yet been implemented'
+    yarachecker.setYaraRulesObject(yaraRulesPath)
+    matches = yarachecker.getYaraMatches(html)
+    maliciousProperties = []
+    for match in matches:
+        matchedRule = match.rule
+        maliciousProperty = rulesInterpretation[matchedRule]
+        maliciousProperties.append(maliciousProperty)  
+    if len(maliciousProperties) > 0:
+        analysisResults['status'] = 'malicious'
+        maliciousProperties = list(dict.fromkeys(maliciousProperties))
+        analysisResults['details'] = ", ".join(maliciousProperties)           
+    else:
+        analysisResults['status'] = 'benign'
+        analysisResults['details'] = 'no malicious properties detected'	
     return analysisResults
 	
-def checkWebpages(webpagesList, method):
+def checkWebpages(webpagesList, method, yaraRulesPath = None):
     results = []
     if method != 'random' and method != 'all' and method not in supportedAlgorithms:
         raise UnsupportedCheckingAlgorithmException("Supported checking algorithms:", supportedAlgorithms, 'random', 'all')
     for webpage in webpagesList:
         if method == 'random':
             randomMethod = random.choice(supportedAlgorithms)
-            analysisResult = analyzeWebpage(webpage, randomMethod)
+            analysisResult = analyzeWebpage(webpage, randomMethod, yaraRulesPath)
             results.append(analysisResult)
         elif method == 'all':
             for algorithm in supportedAlgorithms:
-                analysisResult = analyzeWebpage(webpage, algorithm)
+                analysisResult = analyzeWebpage(webpage, algorithm, yaraRulesPath)
                 results.append(analysisResult)
         else:
-            analysisResult = analyzeWebpage(webpage, method) 
+            analysisResult = analyzeWebpage(webpage, method, yaraRulesPath) 
             results.append(analysisResult)
     return results
 
-def analyzeWebpage(webpage, algorithm):
+def analyzeWebpage(webpage, algorithm, yaraRulesPath = None):
     if algorithm not in supportedAlgorithms:
         raise UnsupportedCheckingAlgorithmException("Supported checking algorithms:", supportedAlgorithms)
+    if algorithm == 'yara rules' and yaraRulesPath is None:
+        raise YaraRulesPathNotSetException("Yara rules path is not set")
     if algorithm == 'static heuristics':
         checkupResult = checkByStaticHeuristics(webpage['html'])
         analysisResult = {key:webpage[key] for key in webpage if key!='html'}
@@ -98,7 +138,7 @@ def analyzeWebpage(webpage, algorithm):
         analysisResult['status'] = checkupResult['status']
         analysisResult['details'] = checkupResult['details']
     elif algorithm == 'yara rules':
-        checkupResult = checkByYaraRules(webpage['html'])
+        checkupResult = checkByYaraRules(webpage['html'], yaraRulesPath)
         analysisResult = {key:webpage[key] for key in webpage if key!='html'}
         analysisResult['algorithm'] = 'yara rules'
         analysisResult['status'] = checkupResult['status']

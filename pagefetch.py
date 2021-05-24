@@ -70,8 +70,33 @@ def fetchMongoHTMLSet(numberOfPages, offset = 0):
         htmlSet.append({"id": str(html['_id']) , 'html': html['page']})
     return htmlSet
 	
+def fetchMongoHTMLDatabase(numberOfPages = 268000, offset = 0):
+    if mongoConnection is None:
+        raise ConnectionNotSetException("MongoDB connection not set")
+    webpagesDatabase = mongoConnection[webpagesDatabaseName]
+    urlsList = []
+    hashList = []
+    urlsCollection = webpagesDatabase['urls']
+    urlCrawlsCollection = webpagesDatabase['crawled_data_urls_v0']
+    webpagesCollection = webpagesDatabase['crawled_data_pages_v0']
+    urlsSetCursor = urlsCollection.find({'redirects_to' : { '$exists' : False }, 'disabled' : { '$exists' : False }},{'_id': 0, 'url' : 1}).sort('_id').skip(offset).limit(numberOfPages)
+    for url in urlsSetCursor:
+        urlsList.append(url['url'])
+        webpageUrl = url['url']
+        urlCrawlsCursor = urlCrawlsCollection.find({'url' : { '$eq' : webpageUrl}},{'_id': 0, 'checks' : 1})
+        for urlCrawl in urlCrawlsCursor:
+            checks = urlCrawl['checks']
+            hash = checks[-1]['hash']
+            if hash is not None:
+                webpagesCursor = webpagesCollection.find({'hash' : { '$eq' : hash }},{'page' : 1})
+                for webpage in webpagesCursor:
+                    htmlPath = 'database_webpages/' + str(webpage['_id'])
+                    urlPath = 'database_webpage_urls/' + str(webpage['_id'])
+                    writeHTMLToFile(htmlPath, webpage['page'])
+                    writeHTMLToFile(urlPath, webpageUrl)                 
+		
 def readHTMLFromFile(path):
-    htmlFile = open(path)
+    htmlFile = open(path, encoding='utf-8')
     html = htmlFile.read()
     htmlFile.close();
     return html;
@@ -87,9 +112,20 @@ def readHTMLListFromDir(directory):
     for path in pathList:
         html = readHTMLFromFile(path)
         htmlList.append({'path': path, 'html': html})
-    return htmlList		
+    return htmlList
+
+def readHTMLListFromDatabaseDir(directory):
+    htmlList = []
+    pathList = []
+    childList = listdir(directory)
+    for child in childList:
+        fullPath = join(directory, child)
+        if isfile(fullPath):
+            html = 	readHTMLFromFile(fullPath)	
+            htmlList.append({'id': child, 'html': html})
+    return htmlList
 	
 def writeHTMLToFile(path, html):
-    htmlFile = open(path, "w")
+    htmlFile = open(path, "w", encoding='utf-8')
     htmlFile.write(html)
     htmlFile.close()

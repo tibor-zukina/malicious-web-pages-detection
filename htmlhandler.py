@@ -189,3 +189,12 @@ def containsRedirectingScripts(soup):
             if re.search('window.location.href[ \t]*=|window.location.replace[ \t]*\(',textWithoutFunctions):
                 return True			
     return False
+
+def scriptsInjectXML(soup):
+    webpageScripts = soup.find_all('script');
+    for script in webpageScripts:
+        scriptText = ''.join(script.contents)
+        if scriptText != '':
+            if ('document.implementation.createDocument' in scriptText) or ('XMLHttpRequest' in scriptText and 'responseXML' in scriptText) or ('DOMParser' in scriptText and 'text/xml' in scriptText):
+                return True			
+    return False

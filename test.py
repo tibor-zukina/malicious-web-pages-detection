@@ -15,10 +15,10 @@ def scoringMechanismDatabaseTest(connectionString, databaseName, collectionName,
     checkResult = pagechecker.checkWebpages(htmlList,'scoring mechanism')
     displayResults(checkResult, 'scoring mechanism', expectedResultsPath)
 	
-def yaraRulesDatabaseTest(connectionString, databaseName, collectionName, numberOfPages, offset = 0, expectedResultsPath = None):
+def yaraRulesDatabaseTest(connectionString, databaseName, collectionName, numberOfPages, yaraRulesPath, offset = 0, expectedResultsPath = None):
     pagefetch.setMongoConnection(connectionString, databaseName, collectionName)
     htmlList = pagefetch.fetchMongoHTMLSet(numberOfPages, offset)
-    checkResult = pagechecker.checkWebpages(htmlList,'yara rules')
+    checkResult = pagechecker.checkWebpages(htmlList,'yara rules', yaraRulesPath)
     displayResults(checkResult, 'yara rules', expectedResultsPath)
 	
 def staticHeuristicsDirectoryTest(directoryPath):
@@ -31,9 +31,9 @@ def scoringMechanismDirectoryTest(directoryPath):
     checkResult = pagechecker.checkWebpages(htmlList,'scoring mechanism')
     displayResults(checkResult, 'scoring mechanism')
 
-def yaraRulesDirectoryTest(directoryPath):
+def yaraRulesDirectoryTest(directoryPath, yaraRulesPath):
     htmlList = pagefetch.readHTMLListFromDir(directoryPath)
-    checkResult = pagechecker.checkWebpages(htmlList,'yara rules')
+    checkResult = pagechecker.checkWebpages(htmlList,'yara rules', yaraRulesPath)
     displayResults(checkResult, 'yara rules')
 	
 def staticHeuristicsURLListTest(urlList):
@@ -46,9 +46,9 @@ def scoringMechanismURLListTest(urlList):
     checkResult = pagechecker.checkWebpages(htmlList,'scoring mechanism')
     displayResults(checkResult, 'scoring mechanism')
 
-def yaraRulesURLListTest(urlList):
+def yaraRulesURLListTest(urlList, yaraRulesPath):
     htmlList = pagefetch.fetchRawHTMLList(urlList)
-    checkResult = pagechecker.checkWebpages(htmlList,'yara rules')
+    checkResult = pagechecker.checkWebpages(htmlList,'yara rules', yaraRulesPath)
     displayResults(checkResult, 'yara rules')
 		
 def displayResults(results, algorithm, expectedResultsPath = None):
@@ -77,11 +77,10 @@ def displayResults(results, algorithm, expectedResultsPath = None):
         print("False positive rate: {0} %".format(statistics['falsePositiveRate']))
         print("False negative rate: {0} %".format(statistics['falseNegativeRate']))
 		
-def compareAlgorithms(connectionString, databaseName, collectionName, algorithm1, algorithm2, numberOfPages, offset = 0):
-    pagefetch.setMongoConnection(connectionString, databaseName, collectionName)
-    htmlList = pagefetch.fetchMongoHTMLSet(numberOfPages, offset)
-    firstResults = pagechecker.checkWebpages(htmlList, algorithm1)
-    secondResults = pagechecker.checkWebpages(htmlList, algorithm2)
+def compareAlgorithms(databaseDirectoryPath, algorithm1, algorithm2, yaraRulesPath = None):
+    htmlList = pagefetch.readHTMLListFromDatabaseDir(databaseDirectoryPath)
+    firstResults = pagechecker.checkWebpages(htmlList, algorithm1, yaraRulesPath)
+    secondResults = pagechecker.checkWebpages(htmlList, algorithm2, yaraRulesPath)
     displayResults(firstResults, algorithm1)
     displayResults(secondResults, algorithm2)
     compareResults(firstResults, secondResults, algorithm1, algorithm2)
@@ -105,20 +104,23 @@ def compareResults(firstResults, secondResults, algorithm1, algorithm2):
     matchRate = round(matchingResults/totalResults*100,2);
     print("Match rate between {0} algorithm and {1} algorithm is {2}%".format(algorithm1, algorithm2, matchRate))
 
-def analyzeAllAlgorithms(connectionString, databaseName, collectionName, numberOfPages, expectedResultsPath, analysisResultsPath, offset = 0):
-    pagefetch.setMongoConnection(connectionString, databaseName, collectionName)
-    htmlList = pagefetch.fetchMongoHTMLSet(numberOfPages, offset)
+def analyzeAllAlgorithms(databaseDirectoryPath, yaraRulesPath, analysisResultsPath, expectedResultsPath = None):
+    htmlList = pagefetch.readHTMLListFromDatabaseDir(databaseDirectoryPath)
     
     staticHeuristicsResults = pagechecker.checkWebpages(htmlList,'static heuristics')
     scoringMechanismResults = pagechecker.checkWebpages(htmlList,'scoring mechanism')
-    yaraRulesResults = pagechecker.checkWebpages(htmlList,'yara rules')
-    expectedResults = loadExpectedResults(expectedResultsPath)
+    yaraRulesResults = pagechecker.checkWebpages(htmlList,'yara rules', yaraRulesPath)
+    if expectedResultsPath is not None:
+        expectedResults = loadExpectedResults(expectedResultsPath)
+        expectedStatistics = expectedResultsStatistics(expectedResults)
+    else:
+        expectedResults = None
+        expectedStatistics = None
 	
     staticStatistics = resultsStatistics(staticHeuristicsResults, expectedResults)
     scoringStatistics = resultsStatistics(scoringMechanismResults, expectedResults)
     yaraStatistics = resultsStatistics(yaraRulesResults, expectedResults)
-    expectedStatistics = expectedResultsStatistics(expectedResults)
-	
+    
     allResults = generateCsvReport(staticHeuristicsResults, scoringMechanismResults, yaraRulesResults, expectedResults, staticStatistics, scoringStatistics, yaraStatistics, expectedStatistics)
     writeResultToFile(analysisResultsPath, allResults)  	
     
@@ -171,25 +173,27 @@ connectionString = open('connection_string', 'r').readline()
 databaseName = 'websecradar'
 collectionName = 'crawled_data_pages_v0'
 
-#staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10)   
-#scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10)
-#yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10)
+staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10)   
+scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10)
+yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10, yaraRulesPath = 'yara_rules.yar')
+staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10, expectedResultsPath = 'test/expected_results.csv')
 
 directoryPath = 'list_test'
 
-#staticHeuristicsDirectoryTest(directoryPath)
-#scoringMechanismDirectoryTest(directoryPath)
-#yaraRulesDirectoryTest(directoryPath)
+staticHeuristicsDirectoryTest(directoryPath)
+scoringMechanismDirectoryTest(directoryPath)
+yaraRulesDirectoryTest(directoryPath, 'yara_rules.yar)
 
 urlList = ['https://www.fer.unizg.hr/','https://www.carnet.hr/']
 
-#staticHeuristicsURLListTest(urlList)
-#scoringMechanismURLListTest(urlList)
-#yaraRulesURLListTest(urlList)
+staticHeuristicsURLListTest(urlList)
+scoringMechanismURLListTest(urlList)
+yaraRulesURLListTest(urlList, 'yara_rules.yar)
 
-compareAlgorithms(connectionString, databaseName, collectionName, 'static heuristics', 'scoring mechanism', 10, offset = 0)
-#compareAlgorithms(connectionString, databaseName, collectionName, 'static heuristics', 'yara rules', 10, offset = 0)
-#compareAlgorithms(connectionString, databaseName, collectionName, 'scoring mechanism', 'yara rules', 10, offset = 0)
+databaseDirectoryPath = 'database_webpages'
 
-#staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10, expectedResultsPath = 'test/expected_results.csv')
-analyzeAllAlgorithms(connectionString, databaseName, collectionName, 10, 'test/expected_results.csv', 'test/analysis_results.csv')
+compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'scoring mechanism')
+compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'yara rules', yaraRulesPath = 'yara_rules.yar')
+compareAlgorithms(databaseDirectoryPath, 'scoring mechanism', 'yara rules', yaraRulesPath = 'yara_rules.yar')
+
+analyzeAllAlgorithms(databaseDirectoryPath, yaraRulesPath = 'yara_rules.yar', analysisResultsPath = 'test/analysis_results.csv')
