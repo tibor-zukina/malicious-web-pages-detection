@@ -309,7 +309,7 @@ testHTML = pagefetch.readHTMLFromFile(testPath)
 
 testSoupObject = htmlhandler.makeBeautifulSoup(testHTML)
 
-containsMetaRedirect = htmlhandler.metaRefreshTagsExist(testSoupObject)
+containsMetaRedirect = htmlhandler.metaRedirectExists(testSoupObject)
 
 containsScriptRedirects = htmlhandler.containsRedirectingScripts(testSoupObject)
 
@@ -324,6 +324,16 @@ testHTML = pagefetch.readHTMLFromFile(testPath)
 testSoupObject = htmlhandler.makeBeautifulSoup(testHTML)
 
 doScriptsInjectHTML = htmlhandler.scriptsInjectXML(testSoupObject)
+
+
+Extracting JavaScript code from HTML string:
+---
+
+testPath = 'test/scripts-html.html'
+
+testHTML = pagefetch.readHTMLFromFile(testPath)
+
+javaScriptCode = htmlhandler.extractJavaScriptCode(testHTML)
 
 
 Lexic functions usage (lexicutils.py module):
