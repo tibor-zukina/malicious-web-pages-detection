@@ -1,6 +1,8 @@
 import yara
+import htmlhandler
 
 yaraRules = None
+yaraRulesJavaScript = None
 
 rulesInterpretation = {
 'zerox88_js2': '0x88 Exploit Kit detected in JavaScript code',
@@ -61,13 +63,24 @@ class YaraRulesNotSetException(Exception):
 
 def setYaraRulesObject(path):
     global yaraRules
+    global yaraRulesJavaScript
+    
     yaraRulesFile = open(path, encoding='utf-8')
     yaraRulesString = yaraRulesFile.read()
-    yaraRulesFile.close();
+    yaraRulesFile.close()
     yaraRules = yara.compile(source = yaraRulesString)
+	
+    pathJavaScript = path.replace('.yar','_scripts.yar')
+    yaraRulesFileJavaScript = open(pathJavaScript, encoding='utf-8')
+    yaraRulesStringJavaScript = yaraRulesFileJavaScript.read()
+    yaraRulesFileJavaScript.close();
+    yaraRulesJavaScript = yara.compile(source = yaraRulesStringJavaScript)
 	
 def getYaraMatches(html):
     if yaraRules is None:
         raise YaraRulesNotSetException("Yara rules object not set")
-    matches = yaraRules.match(data=html)
+    scriptCode = htmlhandler.extractJavaScriptCode(html)
+    matchesHTML = yaraRules.match(data=html)
+    matchesJavaScript = yaraRulesJavaScript.match(data=scriptCode)
+    matches = matchesHTML + matchesJavaScript
     return matches

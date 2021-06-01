@@ -112,6 +112,8 @@ def countExternalIFrames(soup, domain = None):
     externalIFrames	= iFramesByType['external']
     return externalIFrames
 
+iFramesWhitelist = ['www.googletagmanager.com']
+
 def searchIFrames(soup):
     iFramesByType = {'small' : 0, 'large' : 0, 'total' : 0}
     webpageIFrames = soup.find_all('iframe');
@@ -119,6 +121,7 @@ def searchIFrames(soup):
     for iFrame in webpageIFrames:
         width = iFrame.get('width')
         height = iFrame.get('height')
+        iFrameSource = iFrame.get('src')
         if (width is not None):
             iFrameWidth = re.sub("[^0-9]", "", width)
         else:
@@ -127,11 +130,22 @@ def searchIFrames(soup):
             iFrameHeight = re.sub("[^0-9]", "", height)
         else:
             iFrameHeight = None
-        if iFrameWidth == '0' or iFrameHeight == '0':
+        if (iFrameWidth == '0' or iFrameHeight == '0') and (not isSourceWhitelisted(iFrameSource)):
             iFramesByType['small'] += 1
         else:
             iFramesByType['large'] += 1		
     return iFramesByType
+	
+def isSourceWhitelisted(iFrameSource):
+
+    if iFrameSource is None:
+        return False
+    parsedUrl = urllib.parse.urlparse(iFrameSource.replace('[','').replace(']',''))
+    iFrameDomain = parsedUrl.netloc
+    if iFrameDomain in iFramesWhitelist:
+        return True
+    else:
+        return False
 
 def countTotalIFrames(soup):
     detectedIFrames = searchIFrames(soup)
@@ -147,7 +161,9 @@ def countLargeIFrames(soup):
     detectedIFrames = searchIFrames(soup)
     largeIFrames = detectedIFrames['large']
     return largeIFrames
-	
+
+scriptsWhitelist = ['document.getElementById(\'rs-plugin-settings-inline-css\')', 'document.getElementById("rs-plugin-settings-inline-css")']
+
 def detectObfuscation(soup):
     scriptsByObfuscation = {'escaped_characters' : 0, 'unescape_function' : 0, 'obfuscated' : 0}
     webpageScripts = soup.find_all('script');
@@ -162,9 +178,15 @@ def detectObfuscation(soup):
             if re.search('%[0-9a-f]{2}',scriptText):
                 scriptsByObfuscation['escaped_characters'] += 1
                 unescapeFound = True
-            if escapedFound and unescapeFound:
+            if escapedFound and unescapeFound and (not isScriptWhitelisted(scriptText)):
                 scriptsByObfuscation['obfuscated'] += 1
     return scriptsByObfuscation
+	
+def isScriptWhitelisted(scriptText):
+    for listed in scriptsWhitelist:
+       if scriptText.find(listed) != -1:
+           return True
+    return False
 
 def countEscapedCharactersScripts(soup):
     detectedScripts = detectObfuscation(soup)
@@ -181,15 +203,37 @@ def countObfuscatedScripts(soup):
     obfuscatedScripts = detectedScripts['obfuscated']
     return obfuscatedScripts
 	
-def metaRefreshTagsExist(soup):
+def metaRedirectExists(soup, domain = None):
     metaTags = soup.find_all('meta')
     for meta in metaTags:
         httpEquiv = meta.get('http-equiv')
         content = meta.get('content')
-        if (httpEquiv is not None and httpEquiv == 'refresh' and content is not None):
+        if (httpEquiv is not None and httpEquiv == 'refresh' and content is not None and (not isMetaRefreshContentWhitelisted(content, domain))):
             return True
     return False
-
+	
+def isMetaRefreshContentWhitelisted(content, domain):
+    contentParts = content.split(';')
+    urlPartFound = False
+    acceptableTime = False
+    minimumRedirectValue = 30
+    for contentPart in contentParts:
+        if contentPart.lower().startswith("url="):
+            urlPartFound = True
+            redirectUrl = contentPart.split("=")[1]
+            parsedUrl = urllib.parse.urlparse(redirectUrl.replace('[','').replace(']',''))
+            redirectDomain = parsedUrl.netloc
+            if domain is not None and redirectDomain .replace('www.','') == domain.replace('www.',''):
+                sameDomainRedirect = True
+            else:
+                sameDomainRedirect = False
+        else:
+            if (contentPart.isnumeric() and int(contentPart) >= minimumRedirectValue):
+                acceptableTime = True
+    if (not urlPartFound):
+        sameDomainRedirect = True	
+    return sameDomainRedirect and acceptableTime
+	
 def containsRedirectingScripts(soup):
     webpageScripts = soup.find_all('script');
     for script in webpageScripts:
@@ -276,8 +320,26 @@ def getLinksStatistics(soup, domain = None):
         rel = style.get('rel')
         if(rel is not None):
             allLinks.append(rel)
+    linkDomains = []
+    localDomainThreshold = 0.80
+    for link in allLinks:
+        linkDomain = urllib.parse.urlparse(link.replace('[','').replace(']','')).netloc
+        if linkDomain:
+            linkDomains.append(linkDomain)
+    if domain is None:
+        if len(linkDomains) > 0:
+            mostCommonDomain = max(set(linkDomains), key=linkDomains.count)
+            mostCommonDomainPercentage = (len([domain for domain in linkDomains if domain == mostCommonDomain]) / len(linkDomains))
+            if mostCommonDomainPercentage >= localDomainThreshold:
+                websiteDomain = mostCommonDomain
+            else:
+                websiteDomain = None
+        else:
+            websiteDomain = None
+    else:
+	    websiteDomain = domain
     for link in allLinks:		
-        if (not isPathLocal(link,domain)):
+        if (not isPathLocal(link,websiteDomain)):
             externalLinksNumber += 1
             linkLengths.append(len(link))
     linksStatistics['minLength'] = min(linkLengths) if (len(linkLengths) > 0) else 0
@@ -332,10 +394,26 @@ def getObjectStatistics(soup):
             objectLinkLengths.append(objectLinkLength)
             objectLinkVowelRatios.append(objectLinkVowelRatio)
             objectLinkSpecialCharRatios.append(objectLinkSpecialCharRatio)      
-        objectAttributesNumber = len(object.attrs.keys())
+        objectAttributesNumber = countObjectAttributes(object)
         objectAttributesNumbers.append(objectAttributesNumber)
     objectStatistics['maxLinkLength'] = max(objectLinkLengths) if (len(objectLinkLengths) > 0) else 0
     objectStatistics['vowelRatio'] = mean(objectLinkVowelRatios) if (len(objectLinkVowelRatios) > 0) else 0.00
     objectStatistics['specialCharRatio'] = mean(objectLinkSpecialCharRatios) if (len(objectLinkSpecialCharRatios) > 0) else 0.00
     objectStatistics['medianAttributesNumber'] = median(objectAttributesNumbers) if (len(objectAttributesNumbers) > 0) else 0
     return objectStatistics
+	
+def countObjectAttributes(object):
+    inlineAttributesCount = len(object.attrs.keys())
+    paramsCount = len(object.find_all('param'))
+    totalAttributes = inlineAttributesCount + paramsCount
+    return totalAttributes
+	
+def extractJavaScriptCode(html):
+    soup = makeBeautifulSoup(html)
+    scripts = soup.find_all('script')
+    scriptTexts = [] 
+    for script in scripts:
+        scriptText = ''.join(script.contents)
+        if scriptText != '':
+            scriptTexts.append(scriptText)
+    return "\n".join(scriptTexts)			

@@ -49,7 +49,7 @@ def calculateScores(html, domain = None):
     return scores
 	
 def prepareScoringParameters(webpagesList, path):
-    scoringParameters = {"foreignThreshold": 100, "scriptsThreshold": 100, "exploitThreshold": 100, "foreign": {}, "scripts": {}, "exploit": {}}
+    scoringParameters = {"foreignThreshold": 9.0, "scriptsThreshold": 6.0, "exploitThreshold": 5.0, "foreign": {}, "scripts": {}, "exploit": {}}
     scoresList = {"foreign": {}, "scripts": {}, "exploit": {}}
     pageIndex = 1
     totalPages = len(webpagesList)

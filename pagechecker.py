@@ -40,7 +40,7 @@ def checkByStaticHeuristics(html, domain = None, httpResponseCode = None):
                         analysisResults['details'] = 'no malicious properties detected'
                     else:
                         if scriptsNumber <= 2:
-                            containsMetaRedirects = htmlhandler.metaRefreshTagsExist(bsObject)
+                            containsMetaRedirects = htmlhandler.metaRedirectExists(bsObject)
                             containsScriptRedirects = htmlhandler.containsRedirectingScripts(bsObject)
                             if containsMetaRedirects or containsScriptRedirects:
                                 analysisResults['status'] = 'malicious'
