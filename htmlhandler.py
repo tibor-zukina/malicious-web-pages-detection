@@ -2,6 +2,8 @@ from html.parser import HTMLParser
 from bs4 import BeautifulSoup
 import urllib.parse
 import re
+from statistics import median, mean
+import lexicutils
 
 def makeBeautifulSoup(html):
     soup = BeautifulSoup(html, 'html.parser')
@@ -55,7 +57,7 @@ def countExternalScripts(soup, domain = None):
     return externalScripts
 
 def isPathLocal(scriptSource, domain = None):
-    parsedUrl = urllib.parse.urlparse(scriptSource)
+    parsedUrl = urllib.parse.urlparse(scriptSource.replace('[','').replace(']',''))
     scriptDomain = parsedUrl.netloc
     if not scriptDomain or domain is not None and scriptDomain.replace('www.','') == domain.replace('www.',''):
         return True
@@ -115,8 +117,16 @@ def searchIFrames(soup):
     webpageIFrames = soup.find_all('iframe');
     iFramesByType['total'] = len(webpageIFrames)
     for iFrame in webpageIFrames:
-        iFrameWidth = re.sub("[^0-9]", "", iFrame.get('width'))
-        iFrameHeight = re.sub("[^0-9]", "", iFrame.get('height'))
+        width = iFrame.get('width')
+        height = iFrame.get('height')
+        if (width is not None):
+            iFrameWidth = re.sub("[^0-9]", "", width)
+        else:
+            iFrameWidth = None
+        if (height is not None):
+            iFrameHeight = re.sub("[^0-9]", "", height)
+        else:
+            iFrameHeight = None
         if iFrameWidth == '0' or iFrameHeight == '0':
             iFramesByType['small'] += 1
         else:
@@ -185,10 +195,27 @@ def containsRedirectingScripts(soup):
     for script in webpageScripts:
         scriptText = ''.join(script.contents)
         if scriptText != '':
-            textWithoutFunctions = re.sub('function[ \t]+[A-Za-z_][0-9A-Za-z_]+[ \t]*\(.*\)[ \t]*{ .*}',  '', scriptText.replace('\n',''))
+            textWithoutFunctions = re.sub('function[ \t]+[A-Za-z_][0-9A-Za-z_]+[ \t]*\([a-zA-Z0-9 _,]+\)[ \t]*{[^\}]*}',  '', scriptText.replace('\n',''))
             if re.search('window.location.href[ \t]*=|window.location.replace[ \t]*\(',textWithoutFunctions):
                 return True			
     return False
+
+def countRedirects(soup):
+    redirects = 0
+    metaTags = soup.find_all('meta')
+    for meta in metaTags:
+        httpEquiv = meta.get('http-equiv')
+        content = meta.get('content')
+        if (httpEquiv is not None and httpEquiv == 'refresh' and content is not None):
+            redirects +=1
+    webpageScripts = soup.find_all('script');
+    for script in webpageScripts:
+        scriptText = ''.join(script.contents)
+        if scriptText != '':
+            textWithoutFunctions = re.sub('function[ \t]+[A-Za-z_][0-9A-Za-z_]+[ \t]*\([a-zA-Z0-9 _,]+\)[ \t]*{[^\}]*}',  '', scriptText.replace('\n',''))
+            redirectMatches = len(re.findall('window.location.href[ \t]*=|window.location.replace[ \t]*\(',textWithoutFunctions))
+            redirects += redirectMatches	
+    return redirects
 
 def scriptsInjectXML(soup):
     webpageScripts = soup.find_all('script');
@@ -198,3 +225,117 @@ def scriptsInjectXML(soup):
             if ('document.implementation.createDocument' in scriptText) or ('XMLHttpRequest' in scriptText and 'responseXML' in scriptText) or ('DOMParser' in scriptText and 'text/xml' in scriptText):
                 return True			
     return False
+	
+def getIFrameLinksStatistics(soup):
+    iFrameLinkLengths = []
+    iFrameLinkVowelRatios = []
+    iFrameLinkSpecialCharRatios = []
+    iFrameLinksStatistics = {}
+    webpageIFrames = soup.find_all('iframe')
+    for iFrame in webpageIFrames:
+        iFrameSource = iFrame.get('src')
+        if iFrameSource is not None:
+            iFrameLinkLength = len(iFrameSource)
+            iFrameLinkVowelRatio = lexicutils.vowelRatio(iFrameSource)
+            iFrameLinkSpecialCharRatio = lexicutils.specialCharRatio(iFrameSource)
+            iFrameLinkLengths.append(iFrameLinkLength)
+            iFrameLinkVowelRatios.append(iFrameLinkVowelRatio)
+            iFrameLinkSpecialCharRatios.append(iFrameLinkSpecialCharRatio)            			 
+    iFrameLinksStatistics['medianLength'] = median(iFrameLinkLengths) if (len(iFrameLinkLengths) > 0) else 0
+    iFrameLinksStatistics['minVowelRatio'] = min(iFrameLinkVowelRatios) if (len(iFrameLinkVowelRatios) > 0) else 0.00
+    iFrameLinksStatistics['minSpecialCharRatio'] = min(iFrameLinkSpecialCharRatios) if (len(iFrameLinkSpecialCharRatios) > 0 )else 0.00
+    return iFrameLinksStatistics
+	
+def getLinksStatistics(soup, domain = None):
+    allLinks = []
+    linkLengths = []
+    externalLinksNumber = 0
+    linksStatistics = {} 
+    links = soup.find_all('a')
+    for link in links:
+        href = link.get('href')
+        if(href is not None):
+            allLinks.append(href)
+    scripts = soup.find_all('script')
+    for script in scripts:
+        src = script.get('src')
+        if(src is not None):
+            allLinks.append(src)
+    embeds = soup.find_all('embed')
+    for embed in embeds:
+        src = embed.get('src')
+        if(src is not None):
+            allLinks.append(src)
+    objects = soup.find_all('object')
+    for object in objects:
+        data = object.get('data')
+        if(data is not None):
+            allLinks.append(data)
+    styles = soup.find_all('style')
+    for style in styles:
+        rel = style.get('rel')
+        if(rel is not None):
+            allLinks.append(rel)
+    for link in allLinks:		
+        if (not isPathLocal(link,domain)):
+            externalLinksNumber += 1
+            linkLengths.append(len(link))
+    linksStatistics['minLength'] = min(linkLengths) if (len(linkLengths) > 0) else 0
+    linksStatistics['externalLinks'] = externalLinksNumber
+    return linksStatistics
+
+def getScriptStatistics(soup):
+    linesNumbers = []
+    wordsNumbers = []
+    specialCharRatios = []
+    scriptLengths = []
+    minimumLineLengths = []
+    maximumStringLengths = []
+    minimumWordLengths = []
+    minimumFunctionArgLengths = []
+    scriptStatistics = {}
+    scripts = soup.find_all('script')
+    for script in scripts:
+        scriptText = ''.join(script.contents)
+        if scriptText != '':
+            linesNumbers.append(lexicutils.linesNumber(scriptText))		
+            wordsNumbers.append(lexicutils.wordsNumber(scriptText))
+            specialCharRatios.append(lexicutils.specialCharRatio(scriptText))
+            scriptLengths.append(len(scriptText))
+            minimumLineLengths.append(lexicutils.minimumLineLength(scriptText))
+            maximumStringLengths.append(lexicutils.maximumStringLength(scriptText))
+            minimumWordLengths.append(lexicutils.minimumWordLength(scriptText))
+            minimumFunctionArgLengths.append(lexicutils.minimumFunctionArgLength(scriptText))
+    scriptStatistics['linesNumber'] = sum(linesNumbers) if (len(linesNumbers) > 0) else 0
+    scriptStatistics['wordsNumber'] = sum(wordsNumbers) if (len(wordsNumbers) > 0) else 0
+    scriptStatistics['specialCharRatio'] = mean(specialCharRatios) if (len(specialCharRatios) > 0) else 0.00
+    scriptStatistics['minimumScriptLength'] = min(scriptLengths) if (len(scriptLengths) > 0) else 0
+    scriptStatistics['minimumLineLength'] = min(minimumLineLengths) if(len(minimumLineLengths) > 0) else 0
+    scriptStatistics['maximumStringLength'] = max(maximumStringLengths) if(len(maximumStringLengths) > 0) else 0
+    scriptStatistics['minimumWordLength'] = min(minimumWordLengths) if(len(minimumWordLengths) > 0) else 0
+    scriptStatistics['minimumFunctionArgLength'] = min(minimumFunctionArgLengths) if(len(minimumFunctionArgLengths) > 0) else 0
+    return scriptStatistics;
+	
+def getObjectStatistics(soup):
+    objectLinkLengths = []
+    objectLinkVowelRatios = []
+    objectLinkSpecialCharRatios = []
+    objectAttributesNumbers = []
+    objectStatistics = {}
+    webpageObjects = soup.find_all('object')
+    for object in webpageObjects:
+        objectSource = object.get('data')
+        if objectSource is not None:
+            objectLinkLength = len(objectSource)
+            objectLinkVowelRatio = lexicutils.vowelRatio(objectSource)
+            objectLinkSpecialCharRatio = lexicutils.specialCharRatio(objectSource)
+            objectLinkLengths.append(objectLinkLength)
+            objectLinkVowelRatios.append(objectLinkVowelRatio)
+            objectLinkSpecialCharRatios.append(objectLinkSpecialCharRatio)      
+        objectAttributesNumber = len(object.attrs.keys())
+        objectAttributesNumbers.append(objectAttributesNumber)
+    objectStatistics['maxLinkLength'] = max(objectLinkLengths) if (len(objectLinkLengths) > 0) else 0
+    objectStatistics['vowelRatio'] = mean(objectLinkVowelRatios) if (len(objectLinkVowelRatios) > 0) else 0.00
+    objectStatistics['specialCharRatio'] = mean(objectLinkSpecialCharRatios) if (len(objectLinkSpecialCharRatios) > 0) else 0.00
+    objectStatistics['medianAttributesNumber'] = median(objectAttributesNumbers) if (len(objectAttributesNumbers) > 0) else 0
+    return objectStatistics

@@ -5,4 +5,4 @@ databaseName = 'websecradar'
 collectionName = 'crawled_data_pages_v0'
 
 pagefetch.setMongoConnection(connectionString, databaseName, collectionName)
-pagefetch.fetchMongoHTMLDatabase(10000,10000)
+pagefetch.fetchMongoHTMLDatabase(offset = 101379)

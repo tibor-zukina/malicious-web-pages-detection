@@ -80,7 +80,10 @@ def fetchMongoHTMLDatabase(numberOfPages = 268000, offset = 0):
     urlCrawlsCollection = webpagesDatabase['crawled_data_urls_v0']
     webpagesCollection = webpagesDatabase['crawled_data_pages_v0']
     urlsSetCursor = urlsCollection.find({'redirects_to' : { '$exists' : False }, 'disabled' : { '$exists' : False }},{'_id': 0, 'url' : 1}).sort('_id').skip(offset).limit(numberOfPages)
+    a = offset
     for url in urlsSetCursor:
+        a += 1
+        print(a)
         urlsList.append(url['url'])
         webpageUrl = url['url']
         urlCrawlsCursor = urlCrawlsCollection.find({'url' : { '$eq' : webpageUrl}},{'_id': 0, 'checks' : 1})
@@ -118,11 +121,15 @@ def readHTMLListFromDatabaseDir(directory):
     htmlList = []
     pathList = []
     childList = listdir(directory)
+    pageIndex = 1
+    totalWebpages = len(childList)
     for child in childList:
         fullPath = join(directory, child)
         if isfile(fullPath):
             html = 	readHTMLFromFile(fullPath)	
             htmlList.append({'id': child, 'html': html})
+            pageIndex += 1
+            print('Loading page: ', pageIndex, '/', totalWebpages)
     return htmlList
 	
 def writeHTMLToFile(path, html):
