@@ -450,11 +450,25 @@ rule possible_includes_base64_packed_functions
 		desc = "Detects possible includes and packed functions" 
 	strings: 
 		$f = /(atob|btoa|;base64|base64,)/ nocase
-		//$ff = /(?:[A-Za-z0-9]{4}){2,}(?:[A-Za-z0-9]{2}[AEIMQUYcgkosw048]=|[A-Za-z0-9][AQgw]==)/ nocase 
 		$fff = /([A-Za-z0-9]{4})*([A-Za-z0-9]{2}==|[A-Za-z0-9]{3}=|[A-Za-z0-9]{4})/ 
 	condition: 
 		$f and $fff
 } 
+
+rule replica_watches_malware
+{
+    strings:
+        $a = "replica watches" wide ascii
+        $b = "www.replica-watches.is" wide ascii
+        $c = "www.fake-watches.is" wide ascii
+        $d = "cc-click-11" 		
+        $e = "cc-contents-11"
+        $f = "eval"
+		$g = "String.fromCharCode"
+		$h = "cc|11|document|getElementById|contents|style|click|display|oInner|event|var|obox|block|target|getAttribute|id|if|function|none|addEventListener|else|relative|parentNode|position"
+	condition:
+        all of them
+}
  
 rule BeEF_browser_hooked {
 	meta:
