@@ -326,8 +326,111 @@ testSoupObject = htmlhandler.makeBeautifulSoup(testHTML)
 doScriptsInjectHTML = htmlhandler.scriptsInjectXML(testSoupObject)
 
 
+Lexic functions usage (lexicutils.py module):
+---
+
+
+Calculation vowel ratio in a string:
+---
+
+lexicutils.vowelRatio(str)
+
+
+Calculating special characters ration in a string:
+---
+
+lexicutils.specialCharRation(str)
+
+
+Calculating lines number in a multiline string:
+---
+
+lexicutils.linesNumber(str)
+
+
+Calculating words number in a string:
+---
+
+lexicutils.wordsNumber(str)
+
+
+Calculating minimum line length in a multiline string:
+---
+
+lexicutils.minimumLineLength(str)
+
+
+Calculating max string literals length in a JavaScript string:
+---
+
+lexicutils.maximumStringLength(javascriptStr)
+
+
+Calculating minimum word length in a string:
+---
+
+lexicutils.minimumWordLength(str)
+
+
+Calculating minimum function argument length in a JavaScript string:
+---
+
+lexicutils.minimumFunctionArgLength(javascriptStr)
+
+
+Scoring checking functions usage (scoringchecker.py module):
+---
+
+
+Set scoring parameters object:
+---
+
+scoringParametersPath = 'scoring_parameters.json'
+
+scoringchecker.setScoringParameters(scoringParametersPath)
+
+
+Preparing scoring parameters for webpages set:
+---
+
+inputPath = 'database_webpages'
+
+scoringParametersPath = 'scoring_parameters.json' 
+
+mongoHTMLSet = pagefetch.readHTMLListFromDatabaseDir(inputPath)
+
+scoringchecker.prepareScoringParameters(mongoHTMLSet, scoringParametersPath) 
+
+
+Calculating scores for HTML page:
+---
+
+scoringParametersPath = 'scoring_parameters.json' 
+
+htmlPath = 'test_html.html'
+
+html = pagefetch.readHTMLFromFile(htmlPath)
+
+scoringchecker.calculateScores(html)
+
+
+Generate malicious diagonisis for given score:
+---
+
+scoringParametersPath = 'scoring_parameters.json' 
+
+htmlPath = 'test_html.html'
+
+html = pagefetch.readHTMLFromFile(htmlPath)
+
+scores = scoringchecker.calculateScores(html)
+
+scoringchecker.generateMaliciousExplanations(scores)
+
+
 Yara checking functions usage (yarachecker.py module):
 ---
+
 
 
 Generate yara rules object:
@@ -361,13 +464,15 @@ Check HTML by the selected algorithm:
 
 testPath = 'test/test-html.html'
 
+scoringParametersPath = 'scoring_parameters.json'
+
 yaraRulesPath = 'yara_rules.yar'
 
 testHTML = pagefetch.readHTMLFromFile(testPath)
 
 staticHeuristicsCheckResult = pagechecker.analyzeWebpage({'html': testHTML}, 'static heuristics')
 
-scoringMechanismCheckResult = pagechecker.analyzeWebpage({'html': testHTML}, 'scoring mechanism')
+scoringMechanismCheckResult = pagechecker.analyzeWebpage({'html': testHTML}, 'scoring mechanism' , scoringParametersPath)
 
 yaraRulesCheckResult = pagechecker.analyzeWebpage({'html': testHTML}, 'yara rules', yaraRulesPath)
 
@@ -377,21 +482,21 @@ Check HTML list by selected algorithm:
 
 inputPath = 'database_webpages'
 
+scoringParametersPath = 'scoring_parameters.json'
+
 yaraRulesPath = 'yara_rules.yar'
 
-pagefetch.readHTMLListFromDatabaseDir(inputPath)
-
-mongoHTMLSet = pagefetch.fetchMongoHTMLSet(10)
+mongoHTMLSet = pagefetch.readHTMLListFromDatabaseDir(inputPath)
 
 staticHeuristicsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'static heuristics')
 
-scoringMechanismCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'scoring mechanism')
+scoringMechanismCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'scoring mechanism', scoringParametersPath = scoringParametersPath)
 
-yaraRulesCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'yara rules', yaraRulesPath)
+yaraRulesCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'yara rules', yaraRulesPath = yaraRulesPath)
 
-randomAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'random', yaraRulesPath)
+randomAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'random', yaraRulesPath = yaraRulesPath)
 
-allAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'all', yaraRulesPath)
+allAlgorithmsCheckResult = pagechecker.checkWebpages(mongoHTMLSet, 'all', yaraRulesPath = yaraRulesPath)
 
 
 Testing malicious webpages detection algorithms (test.py module):
@@ -409,7 +514,7 @@ collectionName = 'crawled_data_pages_v0'
 
 staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10)   
 
-scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10)
+scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10, scoringParametersPath = 'scoring_parameters.json')
 
 yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10, yaraRulesPath = 'yara_rules.yar')
 
@@ -425,7 +530,7 @@ collectionName = 'crawled_data_pages_v0'
 
 staticHeuristicsDatabaseTest(connectionString, databaseName, collectionName, 10, expectedResultsPath = 'test/expected_results.csv')   
 
-scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10, expectedResultsPath = 'test/expected_results.csv')
+scoringMechanismDatabaseTest(connectionString, databaseName, collectionName, 10, scoringParametersPath = 'scoring_parameters.json', expectedResultsPath = 'test/expected_results.csv')
 
 yaraRulesDatabaseTest(connectionString, databaseName, collectionName, 10, yaraRulesPath = 'yara_rules.yar', expectedResultsPath = 'test/expected_results.csv')
 
@@ -435,11 +540,11 @@ Comparing different algorithms results:
 
 databaseDirectoryPath = 'database_webpages'
 
-compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'scoring mechanism')
+compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'scoring mechanism', scoringParametersPath = 'scoring_parameters.json')
 
 compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'yara rules', yaraRulesPath = 'yara_rules.yar')
 
-compareAlgorithms(databaseDirectoryPath, 'scoring mechanism', 'yara rules', yaraRulesPath = 'yara_rules.yar')
+compareAlgorithms(databaseDirectoryPath, 'scoring mechanism', 'yara rules', scoringParametersPath = 'scoring_parameters.json', yaraRulesPath = 'yara_rules.yar')
 
 
 Analysing all algorithms:
@@ -447,5 +552,5 @@ Analysing all algorithms:
 
 databaseDirectoryPath = 'database_webpages'
 
-analyzeAllAlgorithms(databaseDirectoryPath, yaraRulesPath = 'yara_rules.yar', analysisResultsPath = 'test/analysis_results.csv')
+analyzeAllAlgorithms(databaseDirectoryPath, scoringParametersPath = 'scoring_parameters.json', yaraRulesPath = 'yara_rules.yar', analysisResultsPath = 'test/analysis_results.csv')
 
