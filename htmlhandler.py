@@ -315,9 +315,9 @@ def getLinksStatistics(soup, domain = None):
         data = object.get('data')
         if(data is not None):
             allLinks.append(data)
-    styles = soup.find_all('style')
-    for style in styles:
-        rel = style.get('rel')
+    linkElements = soup.find_all('link')
+    for linkElement in linkElements:
+        rel = linkElement.get('rel')
         if(rel is not None):
             allLinks.append(rel)
     linkDomains = []

@@ -190,7 +190,7 @@ def expectedResultsStatistics(expectedResults):
 #scoringMechanismURLListTest(urlList, 'scoring_parameters.json')
 #yaraRulesURLListTest(urlList, 'yara_rules.yar)
 
-databaseDirectoryPath = 'database_webpages2'
+databaseDirectoryPath = 'database_webpages'
 
 #compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'scoring mechanism', scoringParametersPath = 'scoring_parameters.json')
 #compareAlgorithms(databaseDirectoryPath, 'static heuristics', 'yara rules', yaraRulesPath = 'yara_rules.yar')
